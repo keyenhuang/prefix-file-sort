@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE - JetBrains
+.idea/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - General
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific - generated log files
+move_log.json
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Logs
+*.log
+
+# Distribution / packaging
+*.tar.gz
+*.zip
+
+# PyInstaller
+*.manifest
+*.spec.backup
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt

@@ -1,0 +1,6 @@
+# prefix-file-sort dependencies
+# Install with: pip install -r requirements.txt
+
+# Optional: Drag and drop support for folders
+# If not installed, the app will run without drag-drop functionality
+tkinterdnd2>=0.3.0
