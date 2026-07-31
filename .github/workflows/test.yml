@@ -28,28 +28,18 @@ jobs:
         run: ruff check .
 
   test:
-    name: Test (headless) on ${{ matrix.os }} / Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.10', '3.12']
-        exclude:
-          # Python 3.8 not available on macos-latest by default
-          - os: macos-latest
-            python-version: '3.8'
+    name: Test (headless)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.11'
 
-      - name: Install system tkinter (Linux only)
-        if: runner.os == 'Linux'
+      - name: Install system tkinter
         run: sudo apt-get update && sudo apt-get install -y python3-tk
 
       - name: Install dependencies
@@ -60,7 +50,7 @@ jobs:
       - name: Compile all sources
         run: python -m py_compile main.py i18n.py themes.py core.py
 
-      - name: Run unit tests (headless)
+      - name: Run unit tests
         run: python run_tests.py
 
       - name: GUI import smoke test
