@@ -25,7 +25,9 @@ A smart file grouping tool that automatically organizes files into folders based
 
 ## 📸 Screenshots
 
-![File Grouper GUI](docs/images/screenshot.png)
+<p align="center">
+  <img src="docs/images/app_screenshot.png" alt="File Grouper GUI" width="900">
+</p>
 
 ## 🚀 Quick Start
 
