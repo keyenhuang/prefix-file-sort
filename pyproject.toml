@@ -2,7 +2,7 @@
 name = "prefix-file-sort"
 version = "1.1.0"
 description = "A smart file grouping tool that organizes files into folders based on their filename prefixes."
-readme = "docs/README.md"
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 authors = [{ name = "Keyen Huang" }]

@@ -32,6 +32,14 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Detect icon file if available
+icon_file = None
+for name in ('app.ico', 'icon.ico', 'prefix_file_sort.ico'):
+    if os.path.exists(name):
+        icon_file = name
+        datas.append((name, '.'))
+        break
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -48,7 +56,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # You can add an icon file here: 'icon.ico'
+    icon=icon_file,
 )
 
 coll = COLLECT(

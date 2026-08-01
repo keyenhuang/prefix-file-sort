@@ -21,8 +21,9 @@ from core import FileGrouper
 from i18n import get_i18n, set_language, I18n
 from themes import get_theme_manager, set_theme, ThemeManager, THEMES
 
-# Settings storage
-APP_SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".app_settings.json")
+# Settings storage path (primary: user home directory; fallback: application directory)
+APP_SETTINGS_FILE = os.path.join(Path.home(), ".prefix_file_sort_settings.json")
+APP_SETTINGS_FILE_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".app_settings.json")
 
 # Sort mode options: (internal_code, i18n_key). Internal codes are stable and
 # are consumed by core.FileGrouper; the i18n key provides the localized label.
@@ -48,22 +49,25 @@ CONFLICT_POLICIES = [
 
 def load_settings() -> Dict:
     """Load application settings from file."""
-    try:
-        if os.path.exists(APP_SETTINGS_FILE):
-            with open(APP_SETTINGS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception:
-        pass
+    for settings_path in (APP_SETTINGS_FILE, APP_SETTINGS_FILE_LOCAL):
+        try:
+            if os.path.exists(settings_path):
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            continue
     return {"theme": "light", "language": "en"}
 
 
 def save_settings(settings: Dict) -> None:
     """Save application settings to file."""
-    try:
-        with open(APP_SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2)
-    except Exception:
-        pass
+    for settings_path in (APP_SETTINGS_FILE, APP_SETTINGS_FILE_LOCAL):
+        try:
+            with open(settings_path, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=2)
+                return
+        except Exception:
+            continue
 
 
 class SettingsDialog:
@@ -678,9 +682,32 @@ class FileGrouperApp:
 
 def main() -> None:
     """Entry point for the application (used by pyproject.toml [project.scripts])."""
+    # Enable high-DPI awareness on Windows for crisp UI rendering
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            try:
+                import ctypes
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
     if not HAS_DND:
         print("Warning: tkinterdnd2 not available; drag-and-drop disabled. Install with: pip install tkinterdnd2")
     root = TkinterDnD.Tk() if HAS_DND else tk.Tk()
+
+    # Set window icon if available
+    for icon_name in ("app.ico", "icon.ico", "prefix_file_sort.ico"):
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), icon_name)
+        if os.path.exists(icon_path):
+            try:
+                root.iconbitmap(icon_path)
+                break
+            except Exception:
+                pass
+
     FileGrouperApp(root)
     root.mainloop()
 

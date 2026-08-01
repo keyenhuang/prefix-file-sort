@@ -29,8 +29,10 @@ env/
 *~
 .DS_Store
 
-# Project specific - generated log files
+# Project specific - generated log & settings files
 move_log.json
+.app_settings.json
+.prefix_file_sort_settings.json
 
 # OS files
 Thumbs.db

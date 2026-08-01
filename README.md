@@ -7,6 +7,9 @@
 
 A smart file grouping tool that automatically organizes files into folders based on their filename prefixes. Perfect for sorting TV series episodes, numbered documents, or any files with consistent naming patterns.
 
+> **📥 Download Standalone Executable (Windows)**:  
+> Download the latest ready-to-run binary from [GitHub Releases](https://github.com/keyenhuang/prefix-file-sort/releases) (`prefix-file-sort-windows.zip`). No Python installation required!
+
 ## ✨ Features
 
 - **🔍 Smart Prefix Detection**: Automatically extracts and groups files by their filename prefix (text before the first `-`)
