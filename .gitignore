@@ -49,6 +49,9 @@ $RECYCLE.BIN/
 *.zip
 *.exe
 
+# Local scratch directory
+scratch/
+
 # PyInstaller
 *.manifest
 *.spec.backup

@@ -25,39 +25,7 @@ A smart file grouping tool that automatically organizes files into folders based
 
 ## 📸 Screenshots
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                           File Grouper                          │
-├─────────────────────────────────────────────────────────────────┤
-│ Source Folder: [C:\Downloads\TV Series          ] [Browse...]  │
-├─────────────────────────────────────────────────────────────────┤
-│ Default Suffix: [series            ]                             │
-│ File Filter:    [.mp4, .mkv        ]                             │
-│                                                                 │
-│ ┌─ Robustness Settings ─────────────────────────────────────┐   │
-│ │ Conflict Policy: [Skip        ▼]                          │   │
-│ │ ☑ Prefix Case Sensitive                                    │   │
-│ └───────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│ ☐ Enable Numbered Custom Mode                                   │
-│ Custom Folder Names (one per line):                             │
-│ ┌─────────────────────────────────────────────────────────┐    │
-│ │ 01 - First Episode                                        │    │
-│ │ 02 - Second Episode                                       │    │
-│ └─────────────────────────────────────────────────────────┘    │
-│                                                                 │
-│ [Preview Groups]  [Execute Move]  [Undo Last Move]              │
-│                                                                 │
-│ ┌─ Activity Log ────────────────────────────────────────────┐   │
-│ │ [INFO] Folder loaded: TV Series                          │   │
-│ │ [INFO] Found 24 groups with 156 files                     │   │
-│ │ → Target Folder: 01 - First Episode  (8 files)            │   │
-│ │    └─ S01E01.mkv                                         │   │
-│ │    └─ S01E02.mkv                                         │   │
-│ └───────────────────────────────────────────────────────────┘   │
-│ Progress: 45/156 (29%) - S01E12.mkv                            │
-└─────────────────────────────────────────────────────────────────┘
-```
+![File Grouper GUI](docs/images/screenshot.png)
 
 ## 🚀 Quick Start
 
