@@ -17,7 +17,7 @@ root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root / "src"))
 sys.path.insert(0, str(root))
 
-from prefix_file_sort.core import FileGrouper
+from prefix_file_sort.core import FileGrouper  # noqa: E402
 
 
 class TestFileGrouper(unittest.TestCase):
