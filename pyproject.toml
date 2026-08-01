@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "prefix-file-sort"
 version = "1.1.0"
@@ -30,14 +34,14 @@ classifiers = [
 ]
 
 [project.scripts]
-prefix-file-sort = "main:main"
+prefix-file-sort = "prefix_file_sort.main:main"
 
 [project.optional-dependencies]
 dnd = ["tkinterdnd2>=0.3.0"]
 dev = ["ruff>=0.4.0", "pyinstaller>=6.0"]
 
-[tool.setuptools]
-py-modules = ["main", "core", "i18n", "themes"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 120

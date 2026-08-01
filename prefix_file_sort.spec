@@ -5,18 +5,14 @@ import os
 
 block_cipher = None
 
-# Add data files (i18n, themes)
-datas = [
-    ('i18n.py', '.'),
-    ('themes.py', '.'),
-]
+datas = []
 
-# Hidden imports for tkinterdnd2
-hiddenimports = ['tkinterdnd2']
+# Hidden imports for tkinterdnd2 and package modules
+hiddenimports = ['tkinterdnd2', 'prefix_file_sort']
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['src/prefix_file_sort/main.py'],
+    pathex=['src'],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,

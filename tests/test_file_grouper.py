@@ -12,10 +12,12 @@ import os
 from pathlib import Path
 import sys
 
-# Ensure the project root is importable when run directly or via pytest.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Ensure the src directory is importable when run directly or via pytest.
+root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(root / "src"))
+sys.path.insert(0, str(root))
 
-from core import FileGrouper
+from prefix_file_sort.core import FileGrouper
 
 
 class TestFileGrouper(unittest.TestCase):

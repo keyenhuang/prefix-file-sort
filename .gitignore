@@ -47,6 +47,7 @@ $RECYCLE.BIN/
 # Distribution / packaging
 *.tar.gz
 *.zip
+*.exe
 
 # PyInstaller
 *.manifest

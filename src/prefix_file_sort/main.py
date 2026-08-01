@@ -15,11 +15,11 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Set
 
 # Core business logic (tkinter-free, importable in headless/CI environments)
-from core import FileGrouper
+from .core import FileGrouper
 
 # Internationalization and theming
-from i18n import get_i18n, set_language, I18n
-from themes import get_theme_manager, set_theme, ThemeManager, THEMES
+from .i18n import get_i18n, set_language, I18n
+from .themes import get_theme_manager, set_theme, ThemeManager, THEMES
 
 # Settings storage path (primary: user home directory; fallback: application directory)
 APP_SETTINGS_FILE = os.path.join(Path.home(), ".prefix_file_sort_settings.json")

@@ -54,10 +54,10 @@ jobs:
           pip install tkinterdnd2
 
       - name: Compile all sources
-        run: python -m py_compile main.py i18n.py themes.py core.py
+        run: python -m py_compile src/prefix_file_sort/main.py src/prefix_file_sort/i18n.py src/prefix_file_sort/themes.py src/prefix_file_sort/core.py
 
       - name: Run unit tests
         run: python run_tests.py
 
       - name: GUI import smoke test
-        run: python -c "import main; print('GUI import OK')"
+        run: python -c "import sys; sys.path.insert(0, 'src'); from prefix_file_sort.main import main; print('GUI import OK')"
