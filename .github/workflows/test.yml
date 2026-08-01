@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install tkinterdnd2
+          pip install customtkinter tkinterdnd2
 
       - name: Compile all sources
         run: python -m py_compile src/prefix_file_sort/main.py src/prefix_file_sort/i18n.py src/prefix_file_sort/themes.py src/prefix_file_sort/core.py

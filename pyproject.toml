@@ -33,6 +33,10 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
+dependencies = [
+    "customtkinter>=6.0.0",
+]
+
 [project.scripts]
 prefix-file-sort = "prefix_file_sort.main:main"
 

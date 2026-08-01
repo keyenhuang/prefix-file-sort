@@ -46,6 +46,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "preview": "Preview Groups",
         "execute": "Execute Move",
         "undo": "Undo Last Move",
+        "export_log": "Export Log",
         "settings": "Settings",
 
         # Settings dialog
@@ -179,6 +180,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "preview": "预览分组",
         "execute": "执行移动",
         "undo": "撤销上一步",
+        "export_log": "导出日志",
         "settings": "设置",
 
         # Settings dialog

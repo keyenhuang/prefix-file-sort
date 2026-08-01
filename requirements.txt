@@ -1,6 +1,8 @@
 # prefix-file-sort dependencies
 # Install with: pip install -r requirements.txt
 
+# Modern GUI Framework
+customtkinter>=6.0.0
+
 # Optional: Drag and drop support for folders
-# If not installed, the app will run without drag-drop functionality
 tkinterdnd2>=0.3.0

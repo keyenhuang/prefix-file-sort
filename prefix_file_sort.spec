@@ -7,8 +7,8 @@ block_cipher = None
 
 datas = []
 
-# Hidden imports for tkinterdnd2 and package modules
-hiddenimports = ['tkinterdnd2', 'prefix_file_sort']
+# Hidden imports for tkinterdnd2, customtkinter and package modules
+hiddenimports = ['tkinterdnd2', 'customtkinter', 'prefix_file_sort']
 
 a = Analysis(
     ['src/prefix_file_sort/main.py'],

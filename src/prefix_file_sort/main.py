@@ -1,32 +1,32 @@
+"""Main GUI application for prefix-file-sort built with CustomTkinter."""
+
 import os
 import re
 import json
 import threading
-import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext
-from tkinter.ttk import Progressbar, Combobox
+import ctypes
+import sys
+from pathlib import Path
+from datetime import datetime
+from typing import List, Dict, Optional, Tuple, Set
+
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
     HAS_DND = True
 except Exception:
     HAS_DND = False
-from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Optional, Tuple, Set
 
-# Core business logic (tkinter-free, importable in headless/CI environments)
 from .core import FileGrouper
-
-# Internationalization and theming
 from .i18n import get_i18n, set_language, I18n
-from .themes import get_theme_manager, set_theme, ThemeManager, THEMES
+from .themes import get_theme_manager, set_theme, ThemeManager
 
 # Settings storage path (primary: user home directory; fallback: application directory)
 APP_SETTINGS_FILE = os.path.join(Path.home(), ".prefix_file_sort_settings.json")
 APP_SETTINGS_FILE_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".app_settings.json")
 
-# Sort mode options: (internal_code, i18n_key). Internal codes are stable and
-# are consumed by core.FileGrouper; the i18n key provides the localized label.
 SORT_MODES = [
     ("name", "sort_name"),
     ("natural", "sort_natural"),
@@ -36,10 +36,6 @@ SORT_MODES = [
     ("size_smallest", "sort_size_smallest"),
 ]
 
-# Conflict policy options: (internal_code, i18n_key). Internal codes are the
-# stable English strings that core.FileGrouper compares against; the i18n key
-# provides the localized label shown in the UI. Keeping the two decoupled means
-# the conflict policy keeps working correctly after switching the UI language.
 CONFLICT_POLICIES = [
     ("Skip", "conflict_skip"),
     ("Overwrite", "conflict_overwrite"),
@@ -56,7 +52,7 @@ def load_settings() -> Dict:
                     return json.load(f)
         except Exception:
             continue
-    return {"theme": "light", "language": "en"}
+    return {"theme": "dark", "language": "en"}
 
 
 def save_settings(settings: Dict) -> None:
@@ -70,8 +66,18 @@ def save_settings(settings: Dict) -> None:
             continue
 
 
+if HAS_DND:
+    class CTkWithDnD(ctk.CTk, TkinterDnD.DnDWrapper):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.TkdndVersion = TkinterDnD._require(self)
+else:
+    class CTkWithDnD(ctk.CTk):
+        pass
+
+
 class SettingsDialog:
-    """Settings dialog for theme and language selection."""
+    """Settings dialog for theme and language selection with instant UI update."""
 
     def __init__(self, parent, i18n: I18n, theme_mgr: ThemeManager, app):
         self.i18n = i18n
@@ -79,9 +85,9 @@ class SettingsDialog:
         self.app = app
         self.settings = load_settings()
 
-        self.dialog = tk.Toplevel(parent)
+        self.dialog = ctk.CTkToplevel(parent)
         self.dialog.title(i18n("settings_title"))
-        self.dialog.geometry("400x250")
+        self.dialog.geometry("440x300")
         self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -94,217 +100,136 @@ class SettingsDialog:
         self._create_widgets()
 
     def _create_widgets(self):
-        theme = self.theme_mgr.current_theme
         i18n = self.i18n
 
-        frame = tk.Frame(self.dialog, padx=20, pady=20, bg=theme.get("bg_primary"))
-        frame.pack(fill="both", expand=True)
+        self.main_frame = ctk.CTkFrame(self.dialog, corner_radius=10)
+        self.main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
-        tk.Label(frame, text=i18n("language"), font=("Arial", 11),
-                 bg=theme.get("bg_primary"), fg=theme.get("text_primary")).pack(anchor="w", pady=(0, 5))
+        self.lbl_title = ctk.CTkLabel(self.main_frame, text=i18n("settings_title"),
+                                      font=ctk.CTkFont(size=18, weight="bold"))
+        self.lbl_title.pack(anchor="w", padx=15, pady=(15, 10))
 
-        self.lang_var = tk.StringVar(value=i18n.language)
-        lang_frame = tk.Frame(frame, bg=theme.get("bg_primary"))
-        lang_frame.pack(fill="x", pady=(0, 15))
+        # Language Selection
+        self.lbl_lang = ctk.CTkLabel(self.main_frame, text=i18n("language"), font=ctk.CTkFont(size=13))
+        self.lbl_lang.pack(anchor="w", padx=15, pady=(5, 2))
 
-        for lang_code, lang_name in i18n.available_languages.items():
-            tk.Radiobutton(lang_frame, text=lang_name, variable=self.lang_var, value=lang_code,
-                           font=("Arial", 10), bg=theme.get("bg_primary"),
-                           fg=theme.get("text_primary"), selectcolor=theme.get("accent"),
-                           command=self._on_lang_change).pack(side="left", padx=(0, 15))
+        current_lang = "English" if i18n.language == "en" else "中文"
+        self.seg_lang = ctk.CTkSegmentedButton(self.main_frame, values=["English", "中文"],
+                                                command=self._on_lang_change)
+        self.seg_lang.set(current_lang)
+        self.seg_lang.pack(fill="x", padx=15, pady=(0, 15))
 
-        tk.Label(frame, text=i18n("theme"), font=("Arial", 11),
-                 bg=theme.get("bg_primary"), fg=theme.get("text_primary")).pack(anchor="w", pady=(0, 5))
+        # Theme Selection
+        self.lbl_theme = ctk.CTkLabel(self.main_frame, text=i18n("theme"), font=ctk.CTkFont(size=13))
+        self.lbl_theme.pack(anchor="w", padx=15, pady=(5, 2))
 
-        self.theme_var = tk.StringVar(value=theme.name)
-        theme_frame = tk.Frame(frame, bg=theme.get("bg_primary"))
-        theme_frame.pack(fill="x", pady=(0, 20))
+        current_theme = self.settings.get("theme", "dark").capitalize()
+        if current_theme not in ("Light", "Dark", "System"):
+            current_theme = "Dark"
+        self.seg_theme = ctk.CTkSegmentedButton(self.main_frame, values=["Light", "Dark", "System"],
+                                                 command=self._on_theme_change)
+        self.seg_theme.set(current_theme)
+        self.seg_theme.pack(fill="x", padx=15, pady=(0, 20))
 
-        theme_options = [("light", i18n("theme_light")), ("dark", i18n("theme_dark"))]
+        # Close Button
+        self.btn_close = ctk.CTkButton(self.main_frame, text=i18n("close"), command=self.dialog.destroy, width=100)
+        self.btn_close.pack(side="bottom", pady=(0, 15))
 
-        for theme_code, theme_name in theme_options:
-            tk.Radiobutton(theme_frame, text=theme_name, variable=self.theme_var, value=theme_code,
-                           font=("Arial", 10), bg=theme.get("bg_primary"),
-                           fg=theme.get("text_primary"), selectcolor=theme.get("accent"),
-                           command=self._on_theme_change).pack(side="left", padx=(0, 15))
-
-        btn_frame = tk.Frame(frame, bg=theme.get("bg_primary"))
-        btn_frame.pack(side="bottom", pady=(10, 0))
-
-        tk.Button(btn_frame, text=i18n("close"), command=self.dialog.destroy, width=10,
-                  bg=theme.get("btn_secondary_bg"), fg=theme.get("btn_secondary_fg"), relief="flat").pack()
-
-    def _on_lang_change(self):
-        new_lang = self.lang_var.get()
-        self.i18n.language = new_lang
-        self.settings["language"] = new_lang
+    def _on_lang_change(self, value: str):
+        lang_code = "en" if value == "English" else "zh"
+        self.i18n.language = lang_code
+        self.settings["language"] = lang_code
         save_settings(self.settings)
-        set_language(new_lang)
+        set_language(lang_code)
 
-    def _on_theme_change(self):
-        new_theme = self.theme_var.get()
-        self.theme_mgr.set_theme(new_theme)
-        self.settings["theme"] = new_theme
+        # Refresh dialog text
+        self.lbl_title.configure(text=self.i18n("settings_title"))
+        self.lbl_lang.configure(text=self.i18n("language"))
+        self.lbl_theme.configure(text=self.i18n("theme"))
+        self.btn_close.configure(text=self.i18n("close"))
+
+        # Instantly update main app UI language
+        self.app.update_ui_language()
+
+    def _on_theme_change(self, value: str):
+        theme_code = value.lower()
+        ctk.set_appearance_mode(theme_code)
+        self.theme_mgr.set_theme(theme_code)
+        self.settings["theme"] = theme_code
         save_settings(self.settings)
-        set_theme(new_theme)
-        self.app.apply_theme_update()
+        set_theme(theme_code)
 
 
 class FileGrouperApp:
-    """Main application GUI with theme and i18n support."""
+    """Main application GUI using CustomTkinter."""
 
-    def __init__(self, master):
+    def __init__(self, master: CTkWithDnD):
         self.master = master
         self.settings = load_settings()
         self.i18n = get_i18n()
         self.theme_mgr = get_theme_manager()
 
         self.i18n.language = self.settings.get("language", "en")
-        self.theme_mgr.set_theme(self.settings.get("theme", "light"))
-
-        self.source_var = tk.StringVar()
-        self.suffix_var = tk.StringVar(value="series")
-        self.filter_var = tk.StringVar(value="")
-        self.numbering_var = tk.BooleanVar(value=False)
-        self.case_sensitive_var = tk.BooleanVar(value=True)
-        # Conflict policy / sort mode: the widget variables hold the localized
-        # *display* label, while these plain attributes hold the stable internal
-        # code that core.FileGrouper consumes. This decoupling keeps behavior
-        # correct when the UI language is switched at runtime (the combobox is
-        # rebuilt with new labels, but the selected policy/mode is preserved).
-        self._conflict_policy_code = "Skip"
-        self._sort_mode_code = "name"
-        self.conflict_policy_var = tk.StringVar(value=self.i18n("conflict_skip"))
-        self.sort_mode_var = tk.StringVar(value=self.i18n("sort_name"))
+        initial_theme = self.settings.get("theme", "dark")
+        ctk.set_appearance_mode(initial_theme)
 
         self.source_path: Optional[Path] = None
         self.grouper: Optional[FileGrouper] = None
-        self._widgets = {}
 
-        self._apply_theme_to_window()
+        self._conflict_policy_code = "Skip"
+        self._sort_mode_code = "name"
+
         self.master.title(self.i18n("app_title"))
-        try:
-            self.master.geometry("1024x820")
-        except Exception:
-            pass
-        self.master.resizable(True, True)
+        self.master.geometry("1080x880")
+        self.master.minsize(960, 780)
 
         self.create_widgets()
-
-    def _apply_theme_to_window(self):
-        theme = self.theme_mgr.current_theme
-        try:
-            self.master.configure(bg=theme.get("bg_primary"))
-        except Exception:
-            pass
+        self.update_ui_language()
 
     def create_widgets(self):
-        theme = self.theme_mgr.current_theme
         i18n = self.i18n
 
-        self._widgets['title'] = tk.Label(self.master, text=i18n("app_title"), font=("Arial", 18, "bold"),
-                                          bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['title'].pack(pady=12)
+        # Main scrollable container
+        self.container = ctk.CTkFrame(self.master, corner_radius=0, fg_color="transparent")
+        self.container.pack(fill="both", expand=True, padx=20, pady=15)
 
-        # Settings button
-        settings_btn_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        settings_btn_frame.pack(fill="x", padx=20)
-        tk.Frame(settings_btn_frame, bg=theme.get("bg_primary")).pack(side="right")
-        self._widgets['settings_btn'] = tk.Button(settings_btn_frame, text="⚙ " + i18n("settings"),
-                                                   command=self.open_settings, bg=theme.get("btn_secondary_bg"),
-                                                   fg=theme.get("btn_secondary_fg"), relief="flat", padx=10)
-        self._widgets['settings_btn'].pack(side="right")
+        # ----------------------------------------------------
+        # Header Bar
+        # ----------------------------------------------------
+        header_frame = ctk.CTkFrame(self.container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 10))
 
-        # Source folder
-        source_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        source_frame.pack(fill="x", padx=20, pady=5)
-        self._widgets['source_label'] = tk.Label(source_frame, text=i18n("source_folder"), font=("Arial", 10),
-                                                 bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['source_label'].pack(anchor="w")
-        self._widgets['folder_entry'] = tk.Entry(source_frame, textvariable=self.source_var, font=("Arial", 10),
-                                                  bg=theme.get("entry_bg"), fg=theme.get("entry_fg"),
-                                                  insertbackground=theme.get("entry_insert"), relief="solid", bd=1)
-        self._widgets['folder_entry'].pack(fill="x", pady=2)
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left")
 
-        # Options
-        options_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        options_frame.pack(fill="x", padx=20, pady=5)
+        self.lbl_app_title = ctk.CTkLabel(title_frame, text=i18n("app_title"),
+                                           font=ctk.CTkFont(size=22, weight="bold"))
+        self.lbl_app_title.pack(anchor="w")
 
-        left_opt = tk.Frame(options_frame, bg=theme.get("bg_primary"))
-        left_opt.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.btn_settings = ctk.CTkButton(header_frame, text="⚙ " + i18n("settings"),
+                                           command=self.open_settings, width=110,
+                                           fg_color="transparent", border_width=1)
+        self.btn_settings.pack(side="right", anchor="ne")
 
-        self._widgets['suffix_label'] = tk.Label(left_opt, text=i18n("default_suffix"), font=("Arial", 10),
-                                                 bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['suffix_label'].pack(anchor="w")
-        self._widgets['suffix_entry'] = tk.Entry(left_opt, textvariable=self.suffix_var, font=("Arial", 10),
-                                                  bg=theme.get("entry_bg"), fg=theme.get("entry_fg"),
-                                                  insertbackground=theme.get("entry_insert"), relief="solid", bd=1)
-        self._widgets['suffix_entry'].pack(fill="x", pady=(0, 8))
+        # ----------------------------------------------------
+        # Source Folder Card
+        # ----------------------------------------------------
+        card_source = ctk.CTkFrame(self.container, corner_radius=10)
+        card_source.pack(fill="x", pady=6)
 
-        self._widgets['filter_label'] = tk.Label(left_opt, text=i18n("file_filter"), font=("Arial", 10),
-                                                 bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['filter_label'].pack(anchor="w")
-        self._widgets['filter_entry'] = tk.Entry(left_opt, textvariable=self.filter_var, font=("Arial", 10),
-                                                  bg=theme.get("entry_bg"), fg=theme.get("entry_fg"),
-                                                  insertbackground=theme.get("entry_insert"), relief="solid", bd=1)
-        self._widgets['filter_entry'].pack(fill="x")
+        self.lbl_source = ctk.CTkLabel(card_source, text=i18n("source_folder"), font=ctk.CTkFont(size=13, weight="bold"))
+        self.lbl_source.pack(anchor="w", padx=15, pady=(10, 4))
 
-        # Robustness settings
-        right_opt = tk.LabelFrame(options_frame, text=i18n("robustness_settings"), font=("Arial", 9, "bold"),
-                                  bg=theme.get("bg_secondary"), fg=theme.get("text_primary"), padx=10, pady=5)
-        right_opt.pack(side="right", fill="both", expand=True)
+        src_input_frame = ctk.CTkFrame(card_source, fg_color="transparent")
+        src_input_frame.pack(fill="x", padx=15, pady=(0, 12))
 
-        self._widgets['conflict_label'] = tk.Label(right_opt, text=i18n("conflict_policy"), font=("Arial", 9),
-                                                  bg=theme.get("bg_secondary"), fg=theme.get("text_primary"))
-        self._widgets['conflict_label'].grid(row=0, column=0, sticky="w", pady=2)
+        self.entry_source = ctk.CTkEntry(src_input_frame, placeholder_text=i18n("drag_drop_hint"), font=ctk.CTkFont(size=12))
+        self.entry_source.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        conflict_values = [self.i18n(key) for _, key in CONFLICT_POLICIES]
-        self._widgets['conflict_cb'] = Combobox(right_opt, textvariable=self.conflict_policy_var,
-                                                values=conflict_values, state="readonly", width=15)
-        self._widgets['conflict_cb'].grid(row=0, column=1, sticky="w", padx=5, pady=2)
-        self._widgets['conflict_cb'].set(self.i18n(self._key_for_policy(self._conflict_policy_code)))
-        self._widgets['conflict_cb'].bind('<<ComboboxSelected>>', self._on_conflict_selected)
+        self.btn_browse = ctk.CTkButton(src_input_frame, text=i18n("browse"), command=self.browse_folder, width=110)
+        self.btn_browse.pack(side="right")
 
-        self._widgets['case_cb'] = tk.Checkbutton(right_opt, text=i18n("case_sensitive"),
-                                                  variable=self.case_sensitive_var, font=("Arial", 9),
-                                                  bg=theme.get("bg_secondary"), fg=theme.get("text_primary"),
-                                                  selectcolor=theme.get("entry_bg"))
-        self._widgets['case_cb'].grid(row=1, column=0, columnspan=2, sticky="w", pady=2)
-
-        self._widgets['sort_label'] = tk.Label(right_opt, text=i18n("sort_by"), font=("Arial", 9),
-                                               bg=theme.get("bg_secondary"), fg=theme.get("text_primary"))
-        self._widgets['sort_label'].grid(row=2, column=0, sticky="w", pady=2)
-        sort_values = [self.i18n(key) for _, key in SORT_MODES]
-        self._widgets['sort_cb'] = Combobox(right_opt, textvariable=self.sort_mode_var,
-                                            values=sort_values, state="readonly", width=15)
-        self._widgets['sort_cb'].grid(row=2, column=1, sticky="w", padx=5, pady=2)
-        self._widgets['sort_cb'].set(self.i18n(self._key_for_sort(self._sort_mode_code)))
-        self._widgets['sort_cb'].bind('<<ComboboxSelected>>', self._on_sort_selected)
-
-        # Numbered mode
-        numbered_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        numbered_frame.pack(fill="x", padx=20, pady=(10, 5))
-        self._widgets['numbering_cb'] = tk.Checkbutton(numbered_frame, text=i18n("enable_numbered_mode"),
-                                                      variable=self.numbering_var, font=("Arial", 10, "bold"),
-                                                      bg=theme.get("bg_primary"), fg=theme.get("text_primary"),
-                                                      selectcolor=theme.get("entry_bg"))
-        self._widgets['numbering_cb'].pack(anchor="w")
-
-        custom_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        custom_frame.pack(fill="x", padx=20, pady=0)
-        self._widgets['custom_label'] = tk.Label(custom_frame, text=i18n("custom_folder_names"), font=("Arial", 9),
-                                                bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['custom_label'].pack(anchor="w")
-        self._widgets['custom_hint'] = tk.Label(custom_frame, text=i18n("custom_folder_hint"), font=("Arial", 8),
-                                               bg=theme.get("bg_primary"), fg=theme.get("text_secondary"))
-        self._widgets['custom_hint'].pack(anchor="w")
-        self._widgets['custom_text'] = scrolledtext.ScrolledText(custom_frame, height=4, font=("Consolas", 10),
-                                                                  bg=theme.get("entry_bg"), fg=theme.get("entry_fg"))
-        self._widgets['custom_text'].pack(fill="x", pady=2)
-        self.custom_names_text = self._widgets['custom_text']
-        self._widgets['custom_text'].insert(tk.END, i18n("custom_folder_example"))
-
-        # Drag and drop
+        # Drag and Drop binding
         if HAS_DND:
             try:
                 self.master.drop_target_register(DND_FILES)
@@ -312,96 +237,204 @@ class FileGrouperApp:
             except Exception:
                 pass
 
-        # Buttons
-        btn_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        btn_frame.pack(pady=10)
+        # ----------------------------------------------------
+        # Options & Robustness Card
+        # ----------------------------------------------------
+        card_options = ctk.CTkFrame(self.container, corner_radius=10)
+        card_options.pack(fill="x", pady=6)
 
-        self._widgets['browse_btn'] = tk.Button(btn_frame, text=i18n("browse"), command=self.browse_folder, width=12,
-                                                bg=theme.get("btn_secondary_bg"), fg=theme.get("btn_secondary_fg"), relief="flat")
-        self._widgets['browse_btn'].pack(side="left", padx=5)
+        opt_grid = ctk.CTkFrame(card_options, fg_color="transparent")
+        opt_grid.pack(fill="x", padx=15, pady=12)
+        opt_grid.columnconfigure(0, weight=1)
+        opt_grid.columnconfigure(1, weight=1)
 
-        self._widgets['preview_btn'] = tk.Button(btn_frame, text=i18n("preview"), command=self.preview_groups, width=15,
-                                                 bg=theme.get("success"), fg="white")
-        self._widgets['preview_btn'].pack(side="left", padx=5)
+        # Left Column: Suffix & Extension Filter
+        col_left = ctk.CTkFrame(opt_grid, fg_color="transparent")
+        col_left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        self._widgets['execute_btn'] = tk.Button(btn_frame, text=i18n("execute"), command=self.execute_move, width=15,
-                                                  bg=theme.get("error"), fg="white", state="disabled")
-        self._widgets['execute_btn'].pack(side="left", padx=5)
+        self.lbl_suffix = ctk.CTkLabel(col_left, text=i18n("default_suffix"), font=ctk.CTkFont(size=12, weight="bold"))
+        self.lbl_suffix.pack(anchor="w", pady=(0, 2))
+        self.entry_suffix = ctk.CTkEntry(col_left, font=ctk.CTkFont(size=12))
+        self.entry_suffix.insert(0, "series")
+        self.entry_suffix.pack(fill="x", pady=(0, 8))
 
-        self._widgets['undo_btn'] = tk.Button(btn_frame, text=i18n("undo"), command=self.undo_last_move, width=15,
-                                               bg=theme.get("warning"), fg="white", state="disabled")
-        self._widgets['undo_btn'].pack(side="left", padx=5)
+        self.lbl_filter = ctk.CTkLabel(col_left, text=i18n("file_filter"), font=ctk.CTkFont(size=12, weight="bold"))
+        self.lbl_filter.pack(anchor="w", pady=(0, 2))
+        self.entry_filter = ctk.CTkEntry(col_left, placeholder_text=i18n("file_filter_hint"), font=ctk.CTkFont(size=12))
+        self.entry_filter.pack(fill="x")
 
-        self._widgets['export_btn'] = tk.Button(btn_frame, text="Export", command=self.export_log, width=12,
-                                                 bg=theme.get("accent"), fg="white")
-        self._widgets['export_btn'].pack(side="left", padx=5)
+        # Right Column: Robustness Settings
+        col_right = ctk.CTkFrame(opt_grid, corner_radius=8)
+        col_right.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
 
-        # Progress
-        progress_frame = tk.Frame(self.master, bg=theme.get("bg_primary"))
-        progress_frame.pack(fill="x", padx=20, pady=5)
-        self._widgets['progress_label'] = tk.Label(progress_frame, text=i18n("progress_ready"), font=("Arial", 9),
-                                                   bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['progress_label'].pack(anchor="w")
-        self.progress_label = self._widgets['progress_label']
+        self.lbl_robustness = ctk.CTkLabel(col_right, text=i18n("robustness_settings"), font=ctk.CTkFont(size=13, weight="bold"))
+        self.lbl_robustness.pack(anchor="w", padx=12, pady=(8, 6))
 
-        self._widgets['progress_bar'] = Progressbar(progress_frame, mode='determinate', length=800)
-        self._widgets['progress_bar'].pack(fill="x", pady=2)
-        self.progress_bar = self._widgets['progress_bar']
+        robust_inner = ctk.CTkFrame(col_right, fg_color="transparent")
+        robust_inner.pack(fill="x", padx=12, pady=(0, 8))
 
-        # Log
-        self._widgets['log_label'] = tk.Label(self.master, text=i18n("activity_log"), font=("Arial", 10, "bold"),
-                                               bg=theme.get("bg_primary"), fg=theme.get("text_primary"))
-        self._widgets['log_label'].pack(anchor="w", padx=20, pady=(5, 0))
+        self.lbl_conflict = ctk.CTkLabel(robust_inner, text=i18n("conflict_policy"), font=ctk.CTkFont(size=12))
+        self.lbl_conflict.grid(row=0, column=0, sticky="w", pady=4)
+        self.opt_conflict = ctk.CTkOptionMenu(robust_inner, values=[i18n(k) for _, k in CONFLICT_POLICIES],
+                                               command=self._on_conflict_selected, width=150)
+        self.opt_conflict.grid(row=0, column=1, sticky="w", padx=(8, 0), pady=4)
 
-        log_bg = theme.get("bg_canvas") if theme.name == "dark" else "#1e1e1e"
-        log_fg = theme.get("log_info")
-        self._widgets['preview_text'] = scrolledtext.ScrolledText(self.master, height=15, font=("Consolas", 10),
-                                                                  bg=log_bg, fg=log_fg)
-        self._widgets['preview_text'].pack(fill="both", expand=True, padx=20, pady=5)
-        self.preview_text = self._widgets['preview_text']
+        self.chk_case = ctk.CTkCheckBox(robust_inner, text=i18n("case_sensitive"), font=ctk.CTkFont(size=12))
+        self.chk_case.select()
+        self.chk_case.grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
 
-        # Status
-        self._widgets['status_label'] = tk.Label(self.master, text=i18n("status_ready"),
-                                                   fg=theme.get("text_secondary"), anchor="w",
-                                                   bg=theme.get("bg_primary"))
-        self._widgets['status_label'].pack(fill="x", padx=20, pady=5)
-        self.status_label = self._widgets['status_label']
+        self.lbl_sort = ctk.CTkLabel(robust_inner, text=i18n("sort_by"), font=ctk.CTkFont(size=12))
+        self.lbl_sort.grid(row=2, column=0, sticky="w", pady=4)
+        self.opt_sort = ctk.CTkOptionMenu(robust_inner, values=[i18n(k) for _, k in SORT_MODES],
+                                          command=self._on_sort_selected, width=150)
+        self.opt_sort.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=4)
 
-        self._setup_log_tags()
+        # ----------------------------------------------------
+        # Numbered Custom Mode Card
+        # ----------------------------------------------------
+        card_numbered = ctk.CTkFrame(self.container, corner_radius=10)
+        card_numbered.pack(fill="x", pady=6)
 
-        # Store button references for state management
-        self.execute_btn = self._widgets['execute_btn']
-        self.undo_btn = self._widgets['undo_btn']
+        num_inner = ctk.CTkFrame(card_numbered, fg_color="transparent")
+        num_inner.pack(fill="x", padx=15, pady=10)
 
-    def _setup_log_tags(self):
-        theme = self.theme_mgr.current_theme
-        try:
-            self.preview_text.tag_config("info", foreground=theme.get("log_info"))
-            self.preview_text.tag_config("success", foreground=theme.get("log_success"), font=("Consolas", 10, "bold"))
-            self.preview_text.tag_config("warn", foreground=theme.get("log_warning"))
-            self.preview_text.tag_config("error", foreground=theme.get("log_error"), font=("Consolas", 10, "bold"))
-        except Exception:
-            pass
+        self.chk_numbering = ctk.CTkCheckBox(num_inner, text=i18n("enable_numbered_mode"),
+                                              font=ctk.CTkFont(size=13, weight="bold"))
+        self.chk_numbering.pack(anchor="w", pady=(0, 4))
+
+        self.lbl_custom = ctk.CTkLabel(num_inner, text=i18n("custom_folder_names"), font=ctk.CTkFont(size=12))
+        self.lbl_custom.pack(anchor="w")
+
+        self.lbl_custom_hint = ctk.CTkLabel(num_inner, text=i18n("custom_folder_hint"), font=ctk.CTkFont(size=11),
+                                                 text_color="gray")
+        self.lbl_custom_hint.pack(anchor="w", pady=(0, 4))
+
+        self.txt_custom = ctk.CTkTextbox(num_inner, height=80, font=ctk.CTkFont(family="Consolas", size=12))
+        self.txt_custom.pack(fill="x", pady=2)
+        self.txt_custom.insert("1.0", i18n("custom_folder_example"))
+
+        # ----------------------------------------------------
+        # Action Buttons
+        # ----------------------------------------------------
+        btn_bar = ctk.CTkFrame(self.container, fg_color="transparent")
+        btn_bar.pack(fill="x", pady=8)
+
+        self.btn_preview = ctk.CTkButton(btn_bar, text=i18n("preview"), command=self.preview_groups,
+                                         fg_color="#28a745", hover_color="#218838", font=ctk.CTkFont(size=13, weight="bold"))
+        self.btn_preview.pack(side="left", expand=True, fill="x", padx=(0, 6))
+
+        self.btn_execute = ctk.CTkButton(btn_bar, text=i18n("execute"), command=self.execute_move,
+                                         fg_color="#dc3545", hover_color="#c82333", state="disabled",
+                                         font=ctk.CTkFont(size=13, weight="bold"))
+        self.btn_execute.pack(side="left", expand=True, fill="x", padx=6)
+
+        self.btn_undo = ctk.CTkButton(btn_bar, text=i18n("undo"), command=self.undo_last_move,
+                                      fg_color="#ffc107", hover_color="#e0a800", text_color="#1a1a1a", state="disabled",
+                                      font=ctk.CTkFont(size=13, weight="bold"))
+        self.btn_undo.pack(side="left", expand=True, fill="x", padx=6)
+
+        self.btn_export = ctk.CTkButton(btn_bar, text=i18n("export_log"), command=self.export_log,
+                                        fg_color="#17a2b8", hover_color="#138496",
+                                        font=ctk.CTkFont(size=13, weight="bold"))
+        self.btn_export.pack(side="left", expand=True, fill="x", padx=(6, 0))
+
+        # ----------------------------------------------------
+        # Progress Card
+        # ----------------------------------------------------
+        card_progress = ctk.CTkFrame(self.container, corner_radius=10)
+        card_progress.pack(fill="x", pady=6)
+
+        prog_inner = ctk.CTkFrame(card_progress, fg_color="transparent")
+        prog_inner.pack(fill="x", padx=15, pady=8)
+
+        self.lbl_progress = ctk.CTkLabel(prog_inner, text=i18n("progress_ready"), font=ctk.CTkFont(size=12))
+        self.lbl_progress.pack(anchor="w", pady=(0, 4))
+
+        self.progress_bar = ctk.CTkProgressBar(prog_inner)
+        self.progress_bar.set(0.0)
+        self.progress_bar.pack(fill="x")
+
+        # ----------------------------------------------------
+        # Activity Log Card
+        # ----------------------------------------------------
+        card_log = ctk.CTkFrame(self.container, corner_radius=10)
+        card_log.pack(fill="both", expand=True, pady=6)
+
+        log_inner = ctk.CTkFrame(card_log, fg_color="transparent")
+        log_inner.pack(fill="both", expand=True, padx=15, pady=10)
+
+        self.lbl_activity = ctk.CTkLabel(log_inner, text=i18n("activity_log"), font=ctk.CTkFont(size=13, weight="bold"))
+        self.lbl_activity.pack(anchor="w", pady=(0, 4))
+
+        self.txt_log = ctk.CTkTextbox(log_inner, font=ctk.CTkFont(family="Consolas", size=12))
+        self.txt_log.pack(fill="both", expand=True)
+
+        # ----------------------------------------------------
+        # Status Bar
+        # ----------------------------------------------------
+        self.lbl_status = ctk.CTkLabel(self.container, text=i18n("status_ready"), font=ctk.CTkFont(size=12), anchor="w")
+        self.lbl_status.pack(fill="x", pady=(4, 0))
+
+    def update_ui_language(self):
+        """Instantly update all UI labels, placeholders, and options when language changes."""
+        i18n = self.i18n
+
+        self.master.title(i18n("app_title"))
+        self.lbl_app_title.configure(text=i18n("app_title"))
+        self.btn_settings.configure(text="⚙ " + i18n("settings"))
+
+        self.lbl_source.configure(text=i18n("source_folder"))
+        self.entry_source.configure(placeholder_text=i18n("drag_drop_hint"))
+        self.btn_browse.configure(text=i18n("browse"))
+
+        self.lbl_suffix.configure(text=i18n("default_suffix"))
+        self.lbl_filter.configure(text=i18n("file_filter"))
+        self.entry_filter.configure(placeholder_text=i18n("file_filter_hint"))
+
+        self.lbl_robustness.configure(text=i18n("robustness_settings"))
+        self.lbl_conflict.configure(text=i18n("conflict_policy"))
+        self.chk_case.configure(text=i18n("case_sensitive"))
+        self.lbl_sort.configure(text=i18n("sort_by"))
+
+        # Update options menus
+        conflict_vals = [i18n(k) for _, k in CONFLICT_POLICIES]
+        self.opt_conflict.configure(values=conflict_vals)
+        self.opt_conflict.set(i18n(self._key_for_policy(self._conflict_policy_code)))
+
+        sort_vals = [i18n(k) for _, k in SORT_MODES]
+        self.opt_sort.configure(values=sort_vals)
+        self.opt_sort.set(i18n(self._key_for_sort(self._sort_mode_code)))
+
+        self.chk_numbering.configure(text=i18n("enable_numbered_mode"))
+        self.lbl_custom.configure(text=i18n("custom_folder_names"))
+        self.lbl_custom_hint.configure(text=i18n("custom_folder_hint"))
+
+        self.btn_preview.configure(text=i18n("preview"))
+        self.btn_execute.configure(text=i18n("execute"))
+        self.btn_undo.configure(text=i18n("undo"))
+        self.btn_export.configure(text=i18n("export_log"))
+
+        self.lbl_progress.configure(text=i18n("progress_ready"))
+        self.lbl_activity.configure(text=i18n("activity_log"))
+        self.lbl_status.configure(text=i18n("status_ready"))
 
     def open_settings(self):
         SettingsDialog(self.master, self.i18n, self.theme_mgr, self)
 
-    def apply_theme_update(self):
-        self._apply_theme_to_window()
-        for widget in self.master.winfo_children():
-            try:
-                widget.destroy()
-            except Exception:
-                pass
-        self._widgets.clear()
-        self.create_widgets()
-        self.reset_progress()
+    def log(self, message: str, level: str = "INFO"):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        prefix = f"[{timestamp}] [{level}] "
+        try:
+            self.txt_log.insert("end", prefix + message + "\n")
+            self.txt_log.see("end")
+        except Exception:
+            print(prefix + message)
 
     def log_safe(self, message: str, level: str = "INFO"):
         try:
             self.master.after(0, self.log, message, level)
         except Exception:
-            print(f"{level}: {message}")
+            print(f"[{level}] {message}")
 
     def update_progress_safe(self, current: int, total: int, filename: str = ""):
         try:
@@ -409,27 +442,35 @@ class FileGrouperApp:
         except Exception:
             pass
 
-    def set_buttons_state(self, state="normal"):
+    def update_progress(self, current: int, total: int, filename: str = ""):
+        if total > 0:
+            ratio = current / total
+            self.progress_bar.set(ratio)
+            percent = int(ratio * 100)
+            text = f"Progress: {current}/{total} ({percent}%)"
+            if filename:
+                display_name = filename if len(filename) < 40 else filename[:37] + "..."
+                text += f" - {display_name}"
+            self.lbl_progress.configure(text=text)
+
+    def reset_progress(self):
         try:
-            self._widgets['browse_btn'].config(state=state)
-            self._widgets['preview_btn'].config(state=state)
-            if self._widgets['execute_btn']['state'] != 'disabled':
-                self._widgets['execute_btn'].config(state=state)
-            if self._widgets['undo_btn']['state'] != 'disabled':
-                self._widgets['undo_btn'].config(state=state)
-            self._widgets['export_btn'].config(state=state)
+            self.progress_bar.set(0.0)
+            self.lbl_progress.configure(text=self.i18n("progress_ready"))
         except Exception:
             pass
 
-    def log(self, message: str, level: str = "INFO"):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        prefix = f"[{timestamp}] {level}: "
-        tag = level.lower()
+    def set_buttons_state(self, state="normal"):
         try:
-            self.preview_text.insert(tk.END, prefix + message + "\n", tag)
-            self.preview_text.see(tk.END)
+            self.btn_browse.configure(state=state)
+            self.btn_preview.configure(state=state)
+            self.btn_export.configure(state=state)
+            if self.btn_execute.cget("state") != "disabled":
+                self.btn_execute.configure(state=state)
+            if self.btn_undo.cget("state") != "disabled":
+                self.btn_undo.configure(state=state)
         except Exception:
-            print(prefix + message)
+            pass
 
     def export_log(self):
         if not self.source_path:
@@ -439,7 +480,7 @@ class FileGrouperApp:
         log_file = self.source_path / f"audit_log_{ts}.txt"
         try:
             with open(log_file, "w", encoding="utf-8") as f:
-                f.write(self.preview_text.get(1.0, tk.END))
+                f.write(self.txt_log.get("1.0", "end"))
             messagebox.showinfo("Success", f"Audit log exported to:\n{log_file}")
         except Exception as e:
             messagebox.showerror("Export Failed", str(e))
@@ -467,40 +508,24 @@ class FileGrouperApp:
                 messagebox.showerror("Error", "Folder does not exist!")
                 return
             self.source_path = path
-            self.source_var.set(str(self.source_path))
+            self.entry_source.delete(0, "end")
+            self.entry_source.insert(0, str(self.source_path))
             self.grouper = FileGrouper(self.source_path)
 
-            self.preview_text.delete(1.0, tk.END)
+            self.txt_log.delete("1.0", "end")
             self.reset_progress()
 
             undo_state = "normal" if self.grouper.log_path.exists() else "disabled"
-            self._widgets['undo_btn'].config(state=undo_state)
-            self._widgets['execute_btn'].config(state="disabled")
+            self.btn_undo.configure(state=undo_state)
+            self.btn_execute.configure(state="disabled")
 
             self.log(f"Folder loaded: {self.source_path.name}", "INFO")
-            self.status_label.config(text=f"Loaded: {self.source_path.name}", fg="green")
+            self.lbl_status.configure(text=f"Loaded: {self.source_path.name}", text_color="#28a745")
         except Exception as e:
             messagebox.showerror("Load Failed", str(e))
 
-    def reset_progress(self):
-        try:
-            self.progress_bar['value'] = 0
-            self.progress_label.config(text=self.i18n("progress_ready"))
-        except Exception:
-            pass
-
-    def update_progress(self, current: int, total: int, filename: str = ""):
-        if total > 0:
-            percent = int((current / total) * 100)
-            self.progress_bar['value'] = percent
-            text = f"Progress: {current}/{total} ({percent}%)"
-            if filename:
-                display_name = filename if len(filename) < 40 else filename[:37] + "..."
-                text += f" - {display_name}"
-            self.progress_label.config(text=text)
-
     def get_custom_names(self) -> List[str]:
-        text = self.custom_names_text.get(1.0, tk.END).strip()
+        text = self.txt_custom.get("1.0", "end").strip()
         names = [line.strip() for line in text.splitlines() if line.strip()]
         invalid_chars = r'[\\/:\\*?"<>|]'
         for name in names:
@@ -511,7 +536,6 @@ class FileGrouperApp:
 
     @staticmethod
     def _key_for_policy(code: str) -> str:
-        """Return the i18n key for a conflict-policy internal code."""
         for c, key in CONFLICT_POLICIES:
             if c == code:
                 return key
@@ -519,56 +543,44 @@ class FileGrouperApp:
 
     @staticmethod
     def _key_for_sort(code: str) -> str:
-        """Return the i18n key for a sort-mode internal code."""
         for c, key in SORT_MODES:
             if c == code:
                 return key
         return "sort_name"
 
-    def _on_conflict_selected(self, _event) -> None:
-        """Sync the stable conflict-policy code when the user picks a label."""
-        display = self.conflict_policy_var.get()
+    def _on_conflict_selected(self, display: str) -> None:
         for code, key in CONFLICT_POLICIES:
             if self.i18n(key) == display:
                 self._conflict_policy_code = code
                 return
         self._conflict_policy_code = "Skip"
 
-    def _on_sort_selected(self, _event) -> None:
-        """Sync the stable sort-mode code when the user picks a label."""
-        display = self.sort_mode_var.get()
+    def _on_sort_selected(self, display: str) -> None:
         for code, key in SORT_MODES:
             if self.i18n(key) == display:
                 self._sort_mode_code = code
                 return
         self._sort_mode_code = "name"
 
-    def _get_conflict_policy(self) -> str:
-        """Return the stable internal conflict-policy code (language-independent)."""
-        return self._conflict_policy_code
-
-    def _get_sort_mode(self) -> str:
-        """Return the stable internal sort-mode code (language-independent)."""
-        return self._sort_mode_code
-
     def preview_groups(self):
         if not self.source_path or not self.grouper:
             messagebox.showerror("Error", "Please select a folder first!")
             return
 
-        suffix = self.suffix_var.get().strip()
-        use_numbering = self.numbering_var.get()
+        suffix = self.entry_suffix.get().strip()
+        use_numbering = bool(self.chk_numbering.get())
         custom_names = self.get_custom_names()
-        case_sensitive = self.case_sensitive_var.get()
+        case_sensitive = bool(self.chk_case.get())
 
         if not suffix and not use_numbering:
             messagebox.showerror("Error", "Please enter a Default Suffix or enable Numbered Custom Mode!")
             return
 
-        self.preview_text.delete(1.0, tk.END)
+        self.txt_log.delete("1.0", "end")
         self.log(self.i18n("info_preview_start"), "INFO")
 
-        groups = self.grouper.preview_groups(self.filter_var.get(), suffix, use_numbering, custom_names, case_sensitive, self._get_sort_mode())
+        filter_text = self.entry_filter.get().strip()
+        groups = self.grouper.preview_groups(filter_text, suffix, use_numbering, custom_names, case_sensitive, self._sort_mode_code)
 
         total_files = sum(len(files) for files in groups.values())
         self.log(self.i18n("success_found", groups=len(groups), files=total_files), "SUCCESS")
@@ -581,17 +593,19 @@ class FileGrouperApp:
                 self.log(f"   ... and {len(files) - 6} more files", "WARN")
 
         self.log(self.i18n("info_preview_complete"), "INFO")
-        self._widgets['execute_btn'].config(state="normal" if total_files > 0 else "disabled")
+        self.btn_execute.configure(state="normal" if total_files > 0 else "disabled")
 
     def execute_move(self):
         if not self.source_path or not self.grouper:
             return
 
-        suffix = self.suffix_var.get().strip()
-        use_numbering = self.numbering_var.get()
+        suffix = self.entry_suffix.get().strip()
+        use_numbering = bool(self.chk_numbering.get())
         custom_names = self.get_custom_names()
-        case_sensitive = self.case_sensitive_var.get()
-        groups = self.grouper.preview_groups(self.filter_var.get(), suffix, use_numbering, custom_names, case_sensitive, self._get_sort_mode())
+        case_sensitive = bool(self.chk_case.get())
+        filter_text = self.entry_filter.get().strip()
+
+        groups = self.grouper.preview_groups(filter_text, suffix, use_numbering, custom_names, case_sensitive, self._sort_mode_code)
         total_files = sum(len(files) for files in groups.values())
         if total_files == 0:
             messagebox.showinfo("Nothing to do", "No files matched the filter/prefix criteria.")
@@ -609,13 +623,13 @@ class FileGrouperApp:
 
     def _execute_move_thread(self):
         try:
-            filter_text = self.filter_var.get()
-            suffix = self.suffix_var.get().strip()
-            use_numbering = self.numbering_var.get()
+            filter_text = self.entry_filter.get().strip()
+            suffix = self.entry_suffix.get().strip()
+            use_numbering = bool(self.chk_numbering.get())
             custom_names = self.get_custom_names()
-            case_sensitive = self.case_sensitive_var.get()
-            conflict_policy = self._get_conflict_policy()
-            sort_mode = self._get_sort_mode()
+            case_sensitive = bool(self.chk_case.get())
+            conflict_policy = self._conflict_policy_code
+            sort_mode = self._sort_mode_code
 
             moved, skipped, renamed, errors = self.grouper.execute_move(
                 filter_text, suffix, use_numbering, custom_names, case_sensitive, conflict_policy,
@@ -633,8 +647,8 @@ class FileGrouperApp:
         self.log(self.i18n("success_summary", moved=moved, renamed=renamed, skipped=skipped, errors=errors), "SUCCESS")
         self.log(self.i18n("info_move_complete"), "INFO")
 
-        self.status_label.config(text=f"Move completed (Moved {moved}, Renamed {renamed})", fg="green")
-        self._widgets['undo_btn'].config(state="normal")
+        self.lbl_status.configure(text=f"Move completed (Moved {moved}, Renamed {renamed})", text_color="#28a745")
+        self.btn_undo.configure(state="normal")
         self.set_buttons_state("normal")
         self.reset_progress()
 
@@ -672,44 +686,41 @@ class FileGrouperApp:
         self.log(self.i18n("success_undo_summary", count=undone, remaining=remaining_logs), "SUCCESS")
         self.log(self.i18n("info_undo_complete"), "INFO")
 
-        self.status_label.config(text=f"Undo completed ({undone} files restored)", fg="green")
+        self.lbl_status.configure(text=f"Undo completed ({undone} files restored)", text_color="#28a745")
 
         self.set_buttons_state("normal")
-        self._widgets['undo_btn'].config(state="normal" if remaining_logs > 0 else "disabled")
+        self.btn_undo.configure(state="normal" if remaining_logs > 0 else "disabled")
         self.reset_progress()
         messagebox.showinfo("Undo Success", f"Successfully restored {undone} files.\nCleaned up residual empty folders.")
 
 
 def main() -> None:
-    """Entry point for the application (used by pyproject.toml [project.scripts])."""
-    # Enable high-DPI awareness on Windows for crisp UI rendering
+    """Entry point for the application."""
     if os.name == "nt":
         try:
-            import ctypes
             ctypes.windll.shcore.SetProcessDpiAwareness(2)
         except Exception:
             try:
-                import ctypes
                 ctypes.windll.user32.SetProcessDPIAware()
             except Exception:
                 pass
 
     if not HAS_DND:
         print("Warning: tkinterdnd2 not available; drag-and-drop disabled. Install with: pip install tkinterdnd2")
-    root = TkinterDnD.Tk() if HAS_DND else tk.Tk()
 
-    # Set window icon if available
+    app_root = CTkWithDnD()
+
     for icon_name in ("app.ico", "icon.ico", "prefix_file_sort.ico"):
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), icon_name)
         if os.path.exists(icon_path):
             try:
-                root.iconbitmap(icon_path)
+                app_root.iconbitmap(icon_path)
                 break
             except Exception:
                 pass
 
-    FileGrouperApp(root)
-    root.mainloop()
+    FileGrouperApp(app_root)
+    app_root.mainloop()
 
 
 if __name__ == "__main__":

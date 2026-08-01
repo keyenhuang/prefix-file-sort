@@ -27,7 +27,7 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller tkinterdnd2
+          pip install pyinstaller customtkinter tkinterdnd2
 
       - name: Build executable with PyInstaller
         run: pyinstaller prefix_file_sort.spec --clean --noconfirm
