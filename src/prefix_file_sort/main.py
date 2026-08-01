@@ -89,8 +89,9 @@ class SettingsDialog:
         self.dialog.title(i18n("settings_title"))
         self.dialog.geometry("440x300")
         self.dialog.resizable(False, False)
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
+
+        # Do NOT call self.dialog.grab_set() as modal grabs during live theme/language switching cause event loop deadlocks on Windows.
+        self.dialog.after(100, lambda: self._safe_focus())
 
         self.dialog.update_idletasks()
         x = parent.winfo_x() + (parent.winfo_width() - self.dialog.winfo_width()) // 2
@@ -98,6 +99,13 @@ class SettingsDialog:
         self.dialog.geometry(f"+{x}+{y}")
 
         self._create_widgets()
+
+    def _safe_focus(self):
+        try:
+            if self.dialog.winfo_exists():
+                self.dialog.focus_force()
+        except Exception:
+            pass
 
     def _create_widgets(self):
         i18n = self.i18n
@@ -142,22 +150,27 @@ class SettingsDialog:
         save_settings(self.settings)
         set_language(lang_code)
 
-        # Refresh dialog text
-        self.lbl_title.configure(text=self.i18n("settings_title"))
-        self.lbl_lang.configure(text=self.i18n("language"))
-        self.lbl_theme.configure(text=self.i18n("theme"))
-        self.btn_close.configure(text=self.i18n("close"))
+        # Asynchronously update UI labels to prevent event loop deadlock
+        self.dialog.after(10, self._apply_lang_update)
 
-        # Instantly update main app UI language
+    def _apply_lang_update(self):
+        try:
+            if self.dialog.winfo_exists():
+                self.lbl_title.configure(text=self.i18n("settings_title"))
+                self.lbl_lang.configure(text=self.i18n("language"))
+                self.lbl_theme.configure(text=self.i18n("theme"))
+                self.btn_close.configure(text=self.i18n("close"))
+        except Exception:
+            pass
         self.app.update_ui_language()
 
     def _on_theme_change(self, value: str):
         theme_code = value.lower()
-        ctk.set_appearance_mode(theme_code)
-        self.theme_mgr.set_theme(theme_code)
         self.settings["theme"] = theme_code
         save_settings(self.settings)
         set_theme(theme_code)
+        # Asynchronously schedule theme switch on next event loop tick
+        self.dialog.after(10, lambda: ctk.set_appearance_mode(theme_code))
 
 
 class FileGrouperApp:
@@ -168,6 +181,7 @@ class FileGrouperApp:
         self.settings = load_settings()
         self.i18n = get_i18n()
         self.theme_mgr = get_theme_manager()
+        self._settings_dlg: Optional[SettingsDialog] = None
 
         self.i18n.language = self.settings.get("language", "en")
         initial_theme = self.settings.get("theme", "dark")
@@ -206,9 +220,17 @@ class FileGrouperApp:
                                            font=ctk.CTkFont(size=22, weight="bold"))
         self.lbl_app_title.pack(anchor="w")
 
-        self.btn_settings = ctk.CTkButton(header_frame, text="⚙ " + i18n("settings"),
-                                           command=self.open_settings, width=110,
-                                           fg_color="transparent", border_width=1)
+        # High-contrast Settings button in both Light & Dark modes
+        self.btn_settings = ctk.CTkButton(
+            header_frame,
+            text="⚙ " + i18n("settings"),
+            command=self.open_settings,
+            width=110,
+            fg_color=("#3B82F6", "#1F6AA5"),
+            hover_color=("#2563EB", "#144E75"),
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
         self.btn_settings.pack(side="right", anchor="ne")
 
         # ----------------------------------------------------
@@ -419,7 +441,10 @@ class FileGrouperApp:
         self.lbl_status.configure(text=i18n("status_ready"))
 
     def open_settings(self):
-        SettingsDialog(self.master, self.i18n, self.theme_mgr, self)
+        if self._settings_dlg and hasattr(self._settings_dlg, "dialog") and self._settings_dlg.dialog.winfo_exists():
+            self._settings_dlg.dialog.focus()
+            return
+        self._settings_dlg = SettingsDialog(self.master, self.i18n, self.theme_mgr, self)
 
     def log(self, message: str, level: str = "INFO"):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

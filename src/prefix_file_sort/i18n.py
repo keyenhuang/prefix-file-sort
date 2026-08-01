@@ -9,7 +9,7 @@ from typing import Dict, Callable
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "en": {
         # App
-        "app_title": "File Grouper - Enterprise Edition",
+        "app_title": "File Grouper",
 
         # Source folder
         "source_folder": "Source Folder:",
@@ -143,7 +143,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
     "zh": {
         # App
-        "app_title": "文件分组器 - 企业版",
+        "app_title": "文件分组器",
 
         # Source folder
         "source_folder": "源文件夹：",

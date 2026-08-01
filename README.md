@@ -27,7 +27,7 @@ A smart file grouping tool that automatically organizes files into folders based
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  File Grouper Enterprise Edition                 │
+│                           File Grouper                          │
 ├─────────────────────────────────────────────────────────────────┤
 │ Source Folder: [C:\Downloads\TV Series          ] [Browse...]  │
 ├─────────────────────────────────────────────────────────────────┤
