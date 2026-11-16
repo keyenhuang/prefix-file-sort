@@ -12,16 +12,16 @@ A smart file grouping tool that automatically organizes files into folders based
 
 ## ✨ Features
 
-- **🔍 Smart Prefix Detection**: Automatically extracts and groups files by their filename prefix (text before the first `-`)
+- **🔍 Smart Prefix Detection**: Automatically extracts and groups files by their filename prefix (text before the first `-` or a custom delimiter)
 - **👁️ Real-time Preview**: Preview grouping results before executing any file operations
-- **↩️ Safe Undo**: Instantly undo the last batch of file moves with one click
+- **↩️ Safe Undo**: Instantly undo the last batch of file moves with one click (with conflict protection)
 - **⚡ Multi-threaded**: Responsive UI that won't freeze during large batch operations
 - **🎯 Flexible Filtering**: Filter files by extension (e.g., `.mp4`, `.jpg, .png`)
 - **🔀 Multiple Sort Modes**: Order groups by name, natural order, modification time, or file size
 - **🔄 Conflict Handling**: Choose how to handle naming conflicts (Skip, Overwrite, Auto-Rename)
 - **📁 Drag & Drop**: Drag folders directly into the application (when tkinterdnd2 is installed)
-- **🎨 Themes & Languages**: Built-in light/dark themes and English / 中文 interface
-- **📋 Activity Log**: Track all file operations with detailed logging
+- **🎨 Themes & Languages**: Built-in light/dark/system themes, persisted preferences, and English / 中文 interface
+- **📋 Activity Log**: Color-coded, exportable activity log for tracking all file operations
 
 ## 📸 Screenshots
 
@@ -43,22 +43,26 @@ git clone https://github.com/keyenhuang/prefix-file-sort.git
 cd prefix-file-sort
 ```
 
-2. Install dependencies (optional, for drag & drop support):
+2. Install the package and dependencies:
 ```bash
+pip install -e .
+# Optional: install drag & drop support
 pip install -r requirements.txt
 ```
 
 3. Run the application:
 ```bash
-python main.py
+prefix-file-sort
+# Or directly from source:
+PYTHONPATH=src python -m prefix_file_sort
 ```
 
 ## 📖 Usage
 
 ### Basic Usage
 
-1. Click **Browse** to select a folder containing your files
-2. Set the **Default Suffix** for created folders (e.g., `series`, `episode`)
+1. Click **Browse** (or drag & drop / paste a path and press Enter) to select a folder containing your files
+2. Set the **Default Suffix** for created folders (e.g., `series`, `episode`) and optionally a custom **Delimiter** (default: `-`)
 3. Optionally, set a **File Filter** to only process specific file types
 4. Click **Preview Groups** to see how files will be organized
 5. Click **Execute Move** to perform the actual file grouping
@@ -138,7 +142,7 @@ Enable **Prefix Case Sensitive** to treat `Episode` and `episode` as different p
 pip install -r requirements.txt
 
 # Run the application
-python main.py
+PYTHONPATH=src python -m prefix_file_sort
 ```
 
 ### Testing & Linting
@@ -156,10 +160,13 @@ ruff check .
 
 ```
 prefix-file-sort/
-├── main.py                # GUI application (tkinter) — entry point
-├── core.py                # Core grouping/move/undo logic (tkinter-free, unit-tested)
-├── i18n.py                # Internationalization (English / 中文)
-├── themes.py              # Light / dark theme manager
+├── src/prefix_file_sort/
+│   ├── __init__.py        # Package metadata
+│   ├── __main__.py        # `python -m prefix_file_sort` entry point
+│   ├── main.py            # GUI application (CustomTkinter)
+│   ├── core.py            # Core grouping/move/undo logic (tkinter-free, unit-tested)
+│   ├── i18n.py            # Internationalization (English / 中文)
+│   └── themes.py          # Light / dark theme color definitions
 ├── tests/                 # Unit & integration tests
 ├── run_tests.py           # Test runner
 ├── prefix_file_sort.spec  # PyInstaller spec for building a Windows .exe
