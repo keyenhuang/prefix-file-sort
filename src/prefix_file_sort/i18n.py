@@ -18,6 +18,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Options
         "default_suffix": "Default Suffix:",
+        "delimiter": "Delimiter:",
+        "delimiter_hint": "-",
         "file_filter": "File Filter (e.g. .jpg, .xlsx):",
         "file_filter_hint": "Leave empty to process all files",
 
@@ -118,21 +120,37 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "warn_skipped": "Skipped (Conflict): {name}",
         "warn_overwrite": "Overwriting: {name}",
         "warn_file_missing": "File missing for undo: {name}",
+        "warn_undo_conflict": "Skipped undo (destination already exists): {name}",
         "warn_invalid_name": "Invalid Name",
         "warn_invalid_chars": "Folder name '{name}' contains invalid characters",
+        "warn_invalid_suffix": "Default suffix contains invalid filename characters",
         "warn_cleanup_failed": "Cleanup failed for {name}: {error}",
         "warn_cleaned_folder": "Cleaned up empty folder: {name}",
 
         # Errors
+        "error_title": "Error",
         "error_create_folder": "Failed to create folder {name}: {error}",
         "error_overwrite": "Failed to overwrite {name}: {error}",
         "error_move": "Move error for {name}: {error}",
+        "error_dst_is_dir": "Destination is an existing folder (skipped): {name}",
         "error_rollback": "CRITICAL: Log save failed and rollback failed for {name}: {error1} / {error2}",
         "error_undo": "Undo error for {name}: {error}",
         "error_log_save": "Failed to update log after undo: {error}",
         "error_critical": "Critical error during move: {error}",
         "error_critical_undo": "Critical error during undo: {error}",
         "error_log_save_move": "Move rolled back due to log save failure for {name}: {error}",
+
+        # Dialogs / Export / Browse
+        "select_source_folder": "Select Source Folder",
+        "no_folder_title": "No Folder",
+        "no_folder_export": "Please load a folder before exporting the log.",
+        "export_success_title": "Success",
+        "export_success_msg": "Audit log exported to:\n{path}",
+        "export_failed_title": "Export Failed",
+        "invalid_drop_title": "Invalid Drop",
+        "invalid_drop_msg": "Please drop a valid folder.",
+        "drop_error_title": "Drop Error",
+        "drop_error_msg": "Failed to load folder: {error}",
 
         # Info logs
         "info_auto_renamed": "Auto-Renamed to: {name}",
@@ -152,6 +170,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Options
         "default_suffix": "默认后缀：",
+        "delimiter": "分隔符：",
+        "delimiter_hint": "-",
         "file_filter": "文件过滤器（例如 .jpg, .xlsx）：",
         "file_filter_hint": "留空处理所有文件",
 
@@ -252,21 +272,37 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "warn_skipped": "已跳过（冲突）：{name}",
         "warn_overwrite": "正在覆盖：{name}",
         "warn_file_missing": "撤销时文件缺失：{name}",
+        "warn_undo_conflict": "跳过撤销（原路径已存在同名文件）：{name}",
         "warn_invalid_name": "无效名称",
         "warn_invalid_chars": "文件夹名称 '{name}' 包含无效字符",
+        "warn_invalid_suffix": "默认后缀包含无效的文件名字符",
         "warn_cleanup_failed": "清理失败 {name}：{error}",
         "warn_cleaned_folder": "已清理空文件夹：{name}",
 
         # Errors
+        "error_title": "错误",
         "error_create_folder": "创建文件夹失败 {name}：{error}",
         "error_overwrite": "覆盖失败 {name}：{error}",
         "error_move": "移动错误 {name}：{error}",
+        "error_dst_is_dir": "目标路径是已存在的文件夹（已跳过）：{name}",
         "error_rollback": "严重错误：日志保存失败且回滚失败 {name}：{error1} / {error2}",
         "error_undo": "撤销错误 {name}：{error}",
         "error_log_save": "撤销后更新日志失败：{error}",
         "error_critical": "移动过程中的严重错误：{error}",
         "error_critical_undo": "撤销过程中的严重错误：{error}",
         "error_log_save_move": "因日志保存失败而回滚 {name}：{error}",
+
+        # Dialogs / Export / Browse
+        "select_source_folder": "选择源文件夹",
+        "no_folder_title": "未选择文件夹",
+        "no_folder_export": "导出日志前请先加载文件夹。",
+        "export_success_title": "导出成功",
+        "export_success_msg": "审计日志已导出至：\n{path}",
+        "export_failed_title": "导出失败",
+        "invalid_drop_title": "无效拖放",
+        "invalid_drop_msg": "请拖放一个有效的文件夹。",
+        "drop_error_title": "拖放错误",
+        "drop_error_msg": "加载文件夹失败：{error}",
 
         # Info logs
         "info_auto_renamed": "已自动重命名为：{name}",

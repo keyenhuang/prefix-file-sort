@@ -11,7 +11,7 @@ datas = []
 hiddenimports = ['tkinterdnd2', 'customtkinter', 'prefix_file_sort']
 
 a = Analysis(
-    ['src/prefix_file_sort/main.py'],
+    ['src/prefix_file_sort/__main__.py'],
     pathex=['src'],
     binaries=[],
     datas=datas,

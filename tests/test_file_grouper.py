@@ -18,6 +18,7 @@ sys.path.insert(0, str(root / "src"))
 sys.path.insert(0, str(root))
 
 from prefix_file_sort.core import FileGrouper  # noqa: E402
+from prefix_file_sort.i18n import I18n, TRANSLATIONS  # noqa: E402
 
 
 class TestFileGrouper(unittest.TestCase):
@@ -334,6 +335,165 @@ class TestExecuteAndUndo(unittest.TestCase):
         """Undo is a no-op when there is no move log."""
         undone, remaining = self.grouper.undo_last_move()
         self.assertEqual((undone, remaining), (0, 0))
+
+    def test_execute_move_conflict_overwrite(self):
+        """Overwrite policy replaces existing destination file with new content."""
+        (self.source_path / "01-a.mkv").write_text("new content")
+        target_folder = self.source_path / "01 eps"
+        target_folder.mkdir()
+        (target_folder / "01-a.mkv").write_text("old content")
+
+        moved, skipped, renamed, errors = self.grouper.execute_move(
+            "", " eps", False, [], True, "Overwrite")
+
+        self.assertEqual(moved, 1)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(errors, 0)
+        self.assertEqual((target_folder / "01-a.mkv").read_text(), "new content")
+        self.assertFalse((self.source_path / "01-a.mkv").exists())
+
+    def test_execute_move_destination_is_directory(self):
+        """Move fails gracefully when destination path is an existing directory."""
+        (self.source_path / "01-a.mkv").write_text("data")
+        target_folder = self.source_path / "01 eps"
+        (target_folder / "01-a.mkv").mkdir(parents=True)
+
+        moved, skipped, renamed, errors = self.grouper.execute_move(
+            "", " eps", False, [], True, "Overwrite")
+
+        self.assertEqual(moved, 0)
+        self.assertEqual(errors, 1)
+        self.assertTrue((self.source_path / "01-a.mkv").exists())
+
+    def test_undo_skips_when_original_already_exists(self):
+        """Undo must not silently overwrite a newer file at the original path."""
+        (self.source_path / "01-a.mkv").write_text("moved version")
+        self.grouper.execute_move("", " eps", False, [], True, "Skip")
+
+        # Create a new file at the original path
+        (self.source_path / "01-a.mkv").write_text("newer version")
+
+        undone, remaining = self.grouper.undo_last_move()
+        self.assertEqual(undone, 0)
+        self.assertEqual(remaining, 1)
+        self.assertEqual((self.source_path / "01-a.mkv").read_text(), "newer version")
+        self.assertEqual((self.source_path / "01 eps" / "01-a.mkv").read_text(), "moved version")
+
+    def test_undo_does_not_delete_unrelated_numeric_folders(self):
+        """Undo only cleans up folders from the undone batch, never unrelated 01* dirs."""
+        unrelated = self.source_path / "01_unrelated_empty"
+        unrelated.mkdir()
+        (self.source_path / "02-a.mkv").touch()
+        self.grouper.execute_move("", " eps", False, [], True, "Skip")
+
+        self.grouper.undo_last_move()
+        self.assertFalse((self.source_path / "02 eps").exists())
+        self.assertTrue(unrelated.exists())
+
+    def test_multi_batch_undo_only_reverts_last_batch(self):
+        """Undoing only reverts the most recent batch and preserves earlier batches."""
+        (self.source_path / "01-a.mkv").touch()
+        self.grouper.execute_move("", " eps", False, [], True, "Skip")
+
+        (self.source_path / "02-b.mkv").touch()
+        self.grouper.execute_move("", " eps", False, [], True, "Skip")
+
+        undone, remaining = self.grouper.undo_last_move()
+        self.assertEqual(undone, 1)
+        self.assertEqual(remaining, 1)
+        self.assertTrue((self.source_path / "02-b.mkv").exists())
+        self.assertTrue((self.source_path / "01 eps" / "01-a.mkv").exists())
+
+        undone2, remaining2 = self.grouper.undo_last_move()
+        self.assertEqual(undone2, 1)
+        self.assertEqual(remaining2, 0)
+        self.assertTrue((self.source_path / "01-a.mkv").exists())
+
+    def test_batched_log_flush_many_files(self):
+        """Moving more files than log_flush_interval persists all entries and undoes cleanly."""
+        count = 60
+        for i in range(count):
+            (self.source_path / f"01-file_{i:03d}.txt").touch()
+
+        moved, skipped, renamed, errors = self.grouper.execute_move(
+            "", " batch", False, [], True, "Skip", log_flush_interval=15)
+
+        self.assertEqual((moved, skipped, renamed, errors), (count, 0, 0, 0))
+        undone, remaining = self.grouper.undo_last_move()
+        self.assertEqual((undone, remaining), (count, 0))
+
+
+class TestSafetyAndDelimiter(unittest.TestCase):
+    """Tests for folder name sanitization, custom delimiter, and localized logging."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.source_path = Path(self.temp_dir)
+        self.grouper = FileGrouper(self.source_path)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_sanitize_folder_name_prevents_traversal_and_reserved_names(self):
+        self.assertEqual(FileGrouper.sanitize_folder_name(".."), "_group")
+        self.assertEqual(FileGrouper.sanitize_folder_name("."), "_group")
+        self.assertEqual(FileGrouper.sanitize_folder_name("CON"), "_CON")
+        self.assertEqual(FileGrouper.sanitize_folder_name("a:b/c*d?"), "a_b_c_d_")
+
+    def test_preview_prevents_dotdot_prefix_traversal(self):
+        (self.source_path / "..-evil.txt").touch()
+        groups = self.grouper.preview_groups("", "", False, [], True)
+        self.assertNotIn("..", groups)
+        self.assertIn("_group", groups)
+
+    def test_custom_delimiter(self):
+        (self.source_path / "ep01_intro.mp4").touch()
+        (self.source_path / "ep01_main.mp4").touch()
+        (self.source_path / "ep02_intro.mp4").touch()
+        (self.source_path / "no-underscore.mp4").touch()
+
+        groups = self.grouper.preview_groups("", " files", False, [], True, delimiter="_")
+        self.assertEqual(list(groups.keys()), ["ep01 files", "ep02 files"])
+        self.assertEqual(len(groups["ep01 files"]), 2)
+
+        moved, _, _, errors = self.grouper.execute_move(
+            "", " files", False, [], True, "Skip", delimiter="_")
+        self.assertEqual((moved, errors), (3, 0))
+        self.assertTrue((self.source_path / "ep01 files" / "ep01_intro.mp4").exists())
+        self.assertTrue((self.source_path / "no-underscore.mp4").exists())
+
+    def test_localized_log_callback(self):
+        (self.source_path / "01-a.mkv").touch()
+        target = self.source_path / "01 eps"
+        target.mkdir()
+        (target / "01-a.mkv").touch()
+
+        logs = []
+        i18n_zh = I18n("zh")
+        self.grouper.execute_move(
+            "", " eps", False, [], True, "Skip",
+            log_callback=lambda msg, lvl: logs.append((lvl, msg)),
+            translate_func=i18n_zh,
+        )
+        self.assertTrue(any("已跳过" in msg for _, msg in logs))
+
+
+class TestI18n(unittest.TestCase):
+    """Verify translation completeness and placeholder consistency."""
+
+    def test_en_and_zh_keys_match(self):
+        en_keys = set(TRANSLATIONS["en"].keys())
+        zh_keys = set(TRANSLATIONS["zh"].keys())
+        self.assertEqual(en_keys, zh_keys)
+
+    def test_placeholders_match_across_languages(self):
+        import string
+
+        fmt = string.Formatter()
+        for key in TRANSLATIONS["en"]:
+            en_fields = {name for _, name, _, _ in fmt.parse(TRANSLATIONS["en"][key]) if name}
+            zh_fields = {name for _, name, _, _ in fmt.parse(TRANSLATIONS["zh"][key]) if name}
+            self.assertEqual(en_fields, zh_fields, f"Placeholder mismatch for key: {key}")
 
 
 if __name__ == '__main__':
